@@ -1,8 +1,13 @@
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
+
 use macroquad::prelude::*;
 use std::collections::VecDeque;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const GRID: i32 = 24;
 const CELL: f32 = 25.0;
@@ -199,6 +204,17 @@ fn save_leaderboard(path: &Path, entries: &[ScoreEntry]) -> io::Result<()> {
     fs::write(path, contents)
 }
 
+fn leaderboard_file_path() -> io::Result<PathBuf> {
+    let executable = std::env::current_exe()?;
+    let executable_directory = executable.parent().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "the executable path has no parent directory",
+        )
+    })?;
+    Ok(executable_directory.join(LEADERBOARD_FILE))
+}
+
 fn sort_and_trim_leaderboard(entries: &mut Vec<ScoreEntry>) {
     entries.sort_by(|a, b| {
         b.difficulty
@@ -355,12 +371,18 @@ fn draw_side_panel(
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let leaderboard_path = Path::new(LEADERBOARD_FILE);
-    let (mut leaderboard, mut leaderboard_error) = match load_leaderboard(leaderboard_path) {
-        Ok(entries) => (entries, None),
+    let leaderboard_path = leaderboard_file_path();
+    let (mut leaderboard, mut leaderboard_error) = match &leaderboard_path {
+        Ok(path) => match load_leaderboard(path) {
+            Ok(entries) => (entries, None),
+            Err(error) => (
+                Vec::new(),
+                Some(format!("Could not load leaderboard: {error}")),
+            ),
+        },
         Err(error) => (
             Vec::new(),
-            Some(format!("Could not load leaderboard: {error}")),
+            Some(format!("Could not locate leaderboard file: {error}")),
         ),
     };
     let mut can_save_leaderboard = leaderboard_error.is_none();
@@ -525,10 +547,12 @@ async fn main() {
                     score_recorded = true;
 
                     if can_save_leaderboard {
-                        if let Err(error) = save_leaderboard(leaderboard_path, &leaderboard) {
-                            leaderboard_error =
-                                Some(format!("Could not save leaderboard: {error}"));
-                            can_save_leaderboard = false;
+                        if let Ok(path) = &leaderboard_path {
+                            if let Err(error) = save_leaderboard(path, &leaderboard) {
+                                leaderboard_error =
+                                    Some(format!("Could not save leaderboard: {error}"));
+                                can_save_leaderboard = false;
+                            }
                         }
                     }
                 }
@@ -759,6 +783,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn leaderboard_ranks_difficulty_before_score() {
@@ -795,5 +820,44 @@ mod tests {
             ranked_users,
             ["HardHigh", "HardLow", "NormalLow", "EasyHigh"]
         );
+    }
+
+    #[test]
+    fn leaderboard_file_path_is_next_to_the_executable() {
+        let executable = std::env::current_exe().unwrap();
+        let expected = executable.parent().unwrap().join(LEADERBOARD_FILE);
+
+        assert_eq!(leaderboard_file_path().unwrap(), expected);
+    }
+
+    #[test]
+    fn missing_leaderboard_is_empty_and_saved_scores_can_be_reloaded() {
+        let unique_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "rust-snake-leaderboard-{}-{unique_id}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join(LEADERBOARD_FILE);
+
+        assert!(load_leaderboard(&path).unwrap().is_empty());
+
+        let entries = vec![ScoreEntry {
+            username: "Portable".to_owned(),
+            score: 42,
+            difficulty: Difficulty::Hard,
+        }];
+        save_leaderboard(&path, &entries).unwrap();
+        let loaded = load_leaderboard(&path).unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].username, "Portable");
+        assert_eq!(loaded[0].score, 42);
+        assert_eq!(loaded[0].difficulty.name(), "Hard");
+
+        fs::remove_dir_all(directory).unwrap();
     }
 }
