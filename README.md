@@ -11,7 +11,8 @@ Rust Snake is a desktop game where you guide a snake around the board, collect f
 
 ## Screenshots
 
-No screenshots are currently included in the repository.
+![Rust Snake gameplay](assets/screenshots/startscreen.png)
+![Rust Snake gameplay](assets/screenshots/gameplay.png)
 
 <!-- TODO: Add screenshots here when gameplay images are available. -->
 
