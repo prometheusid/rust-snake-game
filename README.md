@@ -42,9 +42,8 @@ You can also click the difficulty buttons on the start screen.
 
 ## Download and Run
 
-There is currently no precompiled GitHub release available. Build the game from source using the instructions below.
-
-The project currently has no external game asset files. If a future build uses external assets, distribute the executable together with those required assets. The leaderboard is also stored beside the executable, so that directory must be writable to save scores.
+Download
+Windows x64 x86 https://github.com/prometheusid/rust-snake-game/releases/tag/v0.1.0
 
 ## Build from Source
 
