@@ -43,7 +43,7 @@ You can also click the difficulty buttons on the start screen.
 ## Download and Run
 
 Download
-Windows x64 x86 https://github.com/prometheusid/rust-snake-game/releases/tag/v0.1.0
+Windows x64 x86 https://github.com/prometheusid/rust-snake-game/releases
 
 ## Build from Source
 
